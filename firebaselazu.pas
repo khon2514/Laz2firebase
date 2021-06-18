@@ -18,12 +18,15 @@ type
 
   TFirebaselaz = class(TComponent)
   private
-    FTablename : string;
+    FChild : string;
+    FTokenid :string;
     FRawdata : TMemo;
     FBufDataset : TBufDataset;
     procedure setBufDataset(AValue: TBufDataset);
+    procedure setChild(AValue: string);
     procedure setRawdata(AValue: TMemo);
-    procedure setTablename(AValue: string);
+    //procedure setTablename(AValue: string);
+    procedure setTokenid(AValue: string);
 
   protected
 
@@ -31,15 +34,17 @@ type
     constructor Create (AOwner: TComponent); override;
     destructor  Destroy; override;
     procedure Notification(AComponent:TComponent;Operation:TOperation);override;
-    procedure Put(url:string;jsonstr:widestring);
-    procedure Post(url:string;jsonstr:widestring);
-    procedure Get(url: string);
-    procedure Patch(url:string;jsonstr:widestring);
-    procedure Delete(url:string;jsonstr:widestring);
+    function Putx(url: string; jsonstr: widestring): Boolean;
+    function Postx(url: string; jsonstr: widestring): Boolean;
+    function Getx(url: string): Boolean;
+    //function Patchx(url: string; jsonstr: widestring): Boolean;
+    function Deletex(url: string; jsonstr: widestring): Boolean;
+    function Search(url, Child, Key, Value: string): Boolean;
   published
-    property Tablename : string read FTablename write setTablename;
+    property Child : string read FChild write setChild;
     property Rawdata : TMemo read FRawdata write setRawdata;
     property BufDataset : TBufDataset read FBufDataset write setBufDataset;
+    property Tokenid :string read FTokenid write setTokenid;
   end;
 
 procedure Register;
@@ -126,10 +131,10 @@ begin
 end;
 { TFirebaselaz }
 
-procedure TFirebaselaz.setTablename(AValue: string);
+procedure TFirebaselaz.setTokenid(AValue: string);
 begin
-  if FTablename=AValue then Exit;
-  FTablename:=AValue;
+  if FTokenid=AValue then Exit;
+  FTokenid:=AValue;
 end;
 
 procedure TFirebaselaz.setRawdata(AValue: TMemo);
@@ -142,6 +147,12 @@ procedure TFirebaselaz.setBufDataset(AValue: TBufDataset);
 begin
   if FBufDataset=AValue then Exit;
   FBufDataset:=AValue;
+end;
+
+procedure TFirebaselaz.setChild(AValue: string);
+begin
+  if FChild=AValue then Exit;
+  FChild:=AValue;
 end;
 
 constructor TFirebaselaz.Create(AOwner: TComponent);
@@ -162,16 +173,21 @@ begin
   if (AComponent =FBufDataset) then FBufDataset:=nil;
 end;
 
-procedure TFirebaselaz.Put(url: string; jsonstr: widestring);
+function TFirebaselaz.Putx(url: string; jsonstr: widestring): Boolean;
 var  response : String;
 begin
-  url:= url+'/'+FTablename+'.json';
+  url:= url+'/'+FChild+'.json';
 
   With TFPHttpClient.Create(Nil) do
   try
     AddHeader('Content-Type', 'application/json; charset=utf-8');
     RequestBody := TStringStream.Create(jsonstr);
     response:= Put(url);
+   if(ResponseStatusCode = 200) then
+   begin
+     Result:=true;
+   end else result:=false;
+
     if FRawdata <> nil then
      FRawdata.Lines.Add(response);
   finally
@@ -180,16 +196,21 @@ begin
 
 end;
 
-procedure TFirebaselaz.Post(url: string; jsonstr: widestring);
+function TFirebaselaz.Postx(url: string; jsonstr: widestring): Boolean;
 var  response : String;
 begin
-  url:= url+'/'+FTablename+'.json';
+  Result:=false;
+  url:= url+'/'+FChild+'.json';
 
   With TFPHttpClient.Create(Nil) do
   try
     AddHeader('Content-Type', 'application/json; charset=utf-8');
     RequestBody := TStringStream.Create(jsonstr);
     response:= Post(url);
+    if(ResponseStatusCode = 200) then
+    begin
+      Result:=true;
+    end else result:=false;
     if FRawdata <> nil then
      FRawdata.Lines.Add(response);
   finally
@@ -198,7 +219,7 @@ begin
 
 end;
 
-procedure TFirebaselaz.Get(url: string);
+function TFirebaselaz.Getx(url: string): Boolean;
 var
   Content,field_,field_1 : string;
   Data: TJSONArray;
@@ -208,9 +229,9 @@ var
   bf : TBufDataset;
 
 begin
-
+  result:=false;
   if url = '' then exit;
-  if FTablename ='' then exit;
+  if FChild ='' then exit;
   if FBufDataset = nil then exit;
 
   bf := TBufDataset.Create(nil);
@@ -218,19 +239,23 @@ begin
   FBufDataset.Clear;
   FBufDataset.Close;
   if FRawdata <> nil then FRawdata.Clear;
-  url:= url+'/'+FTablename+'.json';
+  url:= url+'/'+FChild+'.json';
 
   With TFPHttpClient.Create(Nil) do
   try
     AddHeader('Content-Type', 'application/json; charset=utf-8');
-
-
     Content :=Get(URL);
+    if(ResponseStatusCode = 200) then
+    begin
+      Result:=true;
     if FRawdata <> nil then
     begin
       FRawdata.Clear;
-      FRawdata.Lines.Add(Get(URL));
+      FRawdata.Lines.Add(Content);
     end;
+
+    end else result:=false;
+
     try
      Data := TJSONArray(GetJSON(Content));
      jItem:=Data.Items[0];
@@ -294,8 +319,11 @@ begin
       end;
 
      end;
+
+
     except
     end;
+
 
 
   finally
@@ -307,14 +335,184 @@ begin
   end;
 
 end;
+//
+//function TFirebaselaz.Patchx(url: string; jsonstr: widestring): Boolean;
+//var  response : String;
+//begin
+//  url:= url+'/'+FChild+'.json';
+//
+//  With TFPHttpClient.Create(Nil) do
+//  try
+//    AddHeader('Content-Type', 'application/json; charset=utf-8');
+//    RequestBody := TStringStream.Create(jsonstr);
+//    response:= Patch(url);
+//   if(ResponseStatusCode = 200) then
+//   begin
+//     Result:=true;
+//   end else result:=false;
+//
+//    if FRawdata <> nil then
+//     FRawdata.Lines.Add(response);
+//  finally
+//   Free;
+//  end;
+//
+//end;
 
-procedure TFirebaselaz.Patch(url: string; jsonstr: widestring);
+function TFirebaselaz.Deletex(url: string; jsonstr: widestring): Boolean;
+var  response : String;
 begin
+  url:= url+'/'+FChild+'.json';
+
+  With TFPHttpClient.Create(Nil) do
+  try
+    AddHeader('Content-Type', 'application/json; charset=utf-8');
+    RequestBody := TStringStream.Create(jsonstr);
+    response:= Delete(url);
+   if(ResponseStatusCode = 200) then
+   begin
+     Result:=true;
+   end else result:=false;
+
+    if FRawdata <> nil then
+     FRawdata.Lines.Add(response);
+  finally
+   Free;
+  end;
 
 end;
 
-procedure TFirebaselaz.Delete(url: string; jsonstr: widestring);
+function TFirebaselaz.Search(url, Child, Key,Value: string
+  ): Boolean;
+var
+  Content,field_,urlx : string;
+  Data: TJSONArray;
+  DataArrayItem: TJSONObject;
+  j,k: Integer;
+
+ bf : TBufDataset;
 begin
+  if url = '' then exit;
+  if Child='' then exit;
+  //FBufDataset.DisableControls;
+  FBufDataset.Close;
+  FBufDataset.Clear;
+  //Memo3.Clear;
+
+  urlx:= EncodeUrl('"'+Key+'"')+
+     //'&startTo='+ EncodeUrl('"'+txtValue.Text+'"')+
+     //'&endTo='+ EncodeUrl('"*"')+
+   '&equalTo='+ EncodeUrl('"'+Value+'"')+
+   '';
+
+  url:= url+'/'+Child+'.json'+
+  '?orderBy='+urlx+
+  '&print=pretty';
+
+ //Memo3.Lines.Add(url);
+ //exit;
+  With TFPHttpClient.Create(Nil) do
+  try
+    RequestHeaders.Clear;
+    AllowRedirect := true;
+    AddHeader('Content-Type','application/json; charset=UTF-8');
+    AddHeader('Accept', 'application/json');
+    if FRawdata <> nil then
+    FRawdata.Clear;
+
+   try;
+    Content:='';
+    Content := Get(url);
+    if FRawdata <> nil then
+     FRawdata.Lines.Add(Content);
+   except
+    on E: Exception do
+    begin
+     if FRawdata <> nil then
+      FRawdata.Lines.Add('An exception was raised: ' + E.Message);
+    end;
+
+   end;
+    bf := TBufDataset.Create(nil);
+
+    try
+     Data := TJSONArray(GetJSON(Content));
+     //DataArrayItem :=  Data.Objects[0];
+
+     for j := 0 to Data.Count-1 do
+     begin
+
+      DataArrayItem :=  Data.Objects[j];
+      //showmessage(inttostr(DataArrayItem.Count));
+      for k := 0 to DataArrayItem.Count-1 do
+      begin
+       //ShowMessage(inttostr(k));
+       if DataArrayItem.Names[k] <> ''  then
+        begin
+        //field_:='';
+        field_:=stringReplace(DataArrayItem.Names[k] ,' ','',[rfReplaceAll, rfIgnoreCase]);
+        field_:=Trim(field_);
+        //showmessage(field_);
+        try
+        bf.FieldDefs.Add(field_, ftWideString, 1000);
+        bf.CreateDataset;
+       except
+       end;
+      end;
+
+     end;
+
+     end;
+
+     //ShowMessage('0');
+     FBufDataset.Clear;
+     FBufDataset.FieldDefs.Assign(bf.FieldDefs);
+     FBufDataset.CreateDataset;
+     FBufDataset.Open;
+
+     Data := TJSONArray(GetJSON(Content));
+     //ShowMessage('1');
+     for j := 0 to Data.Count-1 do
+     begin
+      DataArrayItem :=  Data.Objects[j];
+      //ShowMessage(DataArrayItem[DataArrayItem.Names[0]].AsUnicodeString);
+      if FBufDataset.State in [dsEdit,dsInsert] then  FBufDataset.Post;
+      FBufDataset.Append;
+      for k := 0 to DataArrayItem.Count-1 do
+      begin
+       //ShowMessage(DataArrayItem[DataArrayItem.Names[k]].AsUnicodeString);
+       if DataArrayItem.Names[k] <> ''  then
+        begin
+        field_:='';
+        field_:=stringReplace(DataArrayItem.Names[k] ,' ','',[rfReplaceAll, rfIgnoreCase]);
+        field_:=Trim(field_);
+        //showmessage(field_);
+        if (field_ <> '') and (not DataArrayItem[DataArrayItem.Names[k]].IsNull) then
+         try
+           FBufDataset.FieldByName(DataArrayItem.Names[k]).Value  :=
+            DataArrayItem[DataArrayItem.Names[k]].AsUnicodeString;
+         except
+         end;
+
+        end;
+
+      end;
+      //if FBufDataset.State in [dsEdit,dsInsert] then  FBufDataset.Post;
+     end;
+     //end;
+
+    except
+    end;
+
+
+  finally
+   Free;
+   //RequestBody:=Nil;
+   FBufDataset.EnableControls;
+   bf.Free;
+   //DataArrayItem.Free;
+   //Data.Free;
+  end;
 
 end;
 
